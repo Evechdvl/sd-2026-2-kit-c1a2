@@ -50,7 +50,59 @@ python -m grpc_tools.protoc -I proto --python_out=. \
   --grpc_python_out=. proto/inferencia.proto
 ```
 
-## Execução
+## Execução — teste rápido recomendado
+
+O exemplo `exemplos/cliente_rest.py` é a forma mais simples de testar o
+projeto completo. Ele executa uma inferência síncrona e depois testa o fluxo
+assíncrono com fila, worker e consulta do resultado.
+
+Use quatro terminais, todos na pasta do projeto.
+
+### Terminal 1 — Redis
+
+```bash
+docker compose up -d
+docker compose ps
+```
+
+O Redis precisa aparecer como `Up` e `healthy`.
+
+### Terminal 2 — API REST
+
+```bash
+source .venv/bin/activate
+python -m uvicorn app.api_rest:app --reload --port 8001
+```
+
+Deixe esse terminal aberto. A API ficará em <http://localhost:8001>.
+
+### Terminal 3 — Worker
+
+```bash
+source .venv/bin/activate
+python -m app.worker
+```
+
+O worker deve mostrar que está pronto e aguardando tarefas.
+
+### Terminal 4 — Cliente REST
+
+```bash
+source .venv/bin/activate
+python exemplos/cliente_rest.py "o atendimento foi otimo"
+```
+
+O resultado esperado será parecido com:
+
+```text
+sincrono: {... 'sentimento': 'positivo', ...}
+id da tarefa:  UUID_DA_TAREFA
+assincrono: {... 'status': 'pronto', ...}
+```
+
+O primeiro resultado é síncrono. O segundo passa pela fila Redis e pelo
+worker. Se o mesmo texto já tiver sido processado, pode aparecer
+`'cache_hit': True`.
 
 ### Redis
 
@@ -103,19 +155,51 @@ O servidor escuta a porta `50051`.
 
 ## Cliente REST
 
-Com a API, o Redis e o worker em execução:
+O cliente está em `exemplos/cliente_rest.py`. Com a API, o Redis e o worker em
+execução, rode:
 
 ```bash
 source .venv/bin/activate
 python exemplos/cliente_rest.py "o atendimento foi otimo"
 ```
 
-O cliente testa a rota síncrona e o fluxo assíncrono completo.
+O cliente testa automaticamente a rota síncrona e o fluxo assíncrono completo.
 
 Para usar outra porta:
 
 ```bash
 REST_URL=http://localhost:8000 python exemplos/cliente_rest.py "texto de teste"
+```
+
+O valor padrão é `http://localhost:8001`.
+
+## Solução de problemas
+
+### `Failed to connect to localhost port 8001`
+
+A API não está em execução. Inicie-a com:
+
+```bash
+python -m uvicorn app.api_rest:app --reload --port 8001
+```
+
+### Resposta `na_fila` não muda para `pronto`
+
+O worker não está rodando ou o Redis não está saudável. Confira:
+
+```bash
+docker compose ps
+python -m app.worker
+```
+
+### Erro `422` ao usar `curl`
+
+Use a URL sem colchetes ou parênteses:
+
+```bash
+curl -X POST http://localhost:8001/predict-sync \
+  -H 'Content-Type: application/json' \
+  -d '{"texto":"o atendimento foi otimo"}'
 ```
 
 ## Testes manuais REST
