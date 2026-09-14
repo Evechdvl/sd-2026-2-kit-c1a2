@@ -1,10 +1,11 @@
 """Cliente REST de exemplo. Rode com o servico no ar."""
 import sys
 import time
+import os
 
 import requests
 
-BASE = "http://localhost:8000"
+BASE = os.getenv("REST_URL", "http://localhost:8001")
 
 
 def sincrono(texto):
@@ -14,7 +15,7 @@ def sincrono(texto):
 
 
 def assincrono(texto):
-    """So funciona depois que voce completar as TAREFAS 1, 2 e 3."""
+    """Submete a tarefa e aguarda o resultado processado pelo worker."""
     r = requests.post(f"{BASE}/predict", json={"texto": texto}, timeout=10)
     r.raise_for_status()
     tarefa_id = r.json()["id"]
@@ -36,4 +37,4 @@ if __name__ == "__main__":
     try:
         assincrono(texto)
     except Exception as e:  # noqa: BLE001
-        print("(fluxo assincrono ainda nao implementado:", e, ")")
+        print("erro no fluxo assincrono:", e)

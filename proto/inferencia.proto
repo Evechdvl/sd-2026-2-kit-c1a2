@@ -11,7 +11,7 @@ service Inferencia {
   // Ja implementado no exemplo.
   rpc Prever (PedidoPrever) returns (RespostaPrever);
 
-  // TAREFA 4: implemente este metodo no servidor gRPC.
+  // Recebe varios textos e devolve uma resposta para cada item.
   rpc PreverLote (PedidoLote) returns (RespostaLote);
 }
 

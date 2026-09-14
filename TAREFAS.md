@@ -4,35 +4,35 @@ Marque conforme for concluindo. Cada item aponta o arquivo e a aula de referenci
 
 ## Nucleo obrigatorio (e o que define a nota)
 
-- [ ] **1. Submissao assincrona** - `app/api_rest.py`
+- [x] **1. Submissao assincrona** - `app/api_rest.py`
       Criar `POST /predict` que enfileira a tarefa e devolve `{"id": ...}` com status 202,
       SEM esperar a inferencia terminar. (Aula 8)
 
-- [ ] **2. Consulta de resultado** - `app/api_rest.py`
+- [x] **2. Consulta de resultado** - `app/api_rest.py`
       Criar `GET /resultado/{id}` que devolve o resultado, ou 404 se o id nao existir. (Aula 5)
 
-- [ ] **3. Worker grava o resultado** - `app/worker.py`
+- [x] **3. Worker grava o resultado** - `app/worker.py`
       Substituir o `raise NotImplementedError` por `fila.guardar_resultado(...)`. (Aula 8)
 
-- [ ] **4. Metodo gRPC PreverLote** - `app/servidor_grpc.py` + `proto/inferencia.proto`
+- [x] **4. Metodo gRPC PreverLote** - `app/servidor_grpc.py` + `proto/inferencia.proto`
       Implementar o metodo que recebe varios textos e devolve varias respostas. (Aula 4)
 
-- [ ] **5. Tratamento de erro** - `app/worker.py`
+- [x] **5. Tratamento de erro** - `app/worker.py`
       Retentativa em caso de falha e, apos 3 tentativas, mandar para uma fila de
       descarte (dead-letter). (Aula 8)
 
-- [ ] **6. Log de requisicoes** - todos os servicos
+- [x] **6. Log de requisicoes** - todos os servicos
       Registrar cada requisicao recebida (id, tamanho da entrada, tempo de resposta).
 
-- [ ] **7. README proprio**
+- [x] **7. README proprio**
       Reescrever o README explicando SUA arquitetura e como executar do zero.
 
 ## Extensoes opcionais (nao valem nota extra)
 
-- [ ] Subir 2+ workers e demonstrar a divisao de carga
-- [ ] Cache de resultados para textos repetidos
-- [ ] Medir e expor a latencia media das inferencias
-- [ ] Processamento em lote pela interface REST
+- [x] Subir 2+ workers e demonstrar a divisao de carga
+- [x] Cache de resultados para textos repetidos
+- [x] Medir e expor a latencia media das inferencias
+- [x] Processamento em lote pela interface REST
 
 ## Antes de entregar
 

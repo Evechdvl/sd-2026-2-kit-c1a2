@@ -1,123 +1,205 @@
-# Kit de Partida — C1.A2: Serviço de Inferência Distribuído
+# Serviço de Inferência Distribuído
 
-**Sistemas Distribuídos e Computação em Nuvem · FAESA · 2026/2**
-Prof. Howard Cruz Roatti · Lançado na Aula 6 (10/09) · Entrega na Aula 7 (17/09)
+Projeto C1.A2 de Sistemas Distribuídos e Computação em Nuvem.
 
----
+O sistema recebe textos, executa um classificador local de sentimento e disponibiliza REST e gRPC. O modelo é carregado uma vez por processo.
 
-## O que é isto
+## Arquitetura
 
-Um serviço que recebe um texto, executa uma inferência de IA e devolve o resultado.
-O desafio **não é a IA** (o modelo já vem pronto), e sim expor esse serviço por **duas
-tecnologias de comunicação** (REST e gRPC) e **não deixar o cliente esperando** — usando fila.
+```text
+Cliente REST ──> FastAPI ──> Redis: fila tarefas ──> Worker ──> Modelo local
+      │                         Redis: cache          │
+      │                                               └─ retry/dead-letter
+      └── consulta ──> dados/resultados/<id>.json
 
-> **Sobre a IA neste trabalho:** todo contato com inteligência artificial aqui é
-> **chamada de biblioteca ou de API**. Você **não vai treinar modelos** nem precisar de
-> matemática de aprendizado de máquina. O modelo já vem pronto e configurado.
-> A sua nota vem da **engenharia distribuída**: arquitetura, comunicação, resiliência e
-> execução reproduzível — a sofisticação do modelo **não pontua**.
-
----
-
-## Como começar
-
-```bash
-# 1. Clone o kit e entre na pasta
-git clone https://github.com/howardroatti/sd-2026-2-kit-c1a2.git
-cd sd-2026-2-kit-c1a2
-
-# 2. Crie e ative o ambiente virtual
-python -m venv .venv
-# Windows:
-.venv\Scripts\activate
-# Linux/macOS:
-source .venv/bin/activate
-
-# 3. Instale as dependências
-pip install -r requirements.txt
+Cliente gRPC ────────────────────────────────> Servidor gRPC ──> Modelo local
 ```
 
+- Redis é usado para a fila `tarefas`, a fila `tarefas_dead_letter` e o cache.
+- Resultados processados são gravados em `dados/resultados/`.
+- Métricas são gravadas em `dados/metricas.json`.
+- O cache expira por padrão após 300 segundos.
+
+## Requisitos
+
+- Python 3.10 ou superior
+- Docker e Docker Compose
+
+## Instalação
+
 ```bash
-# 4. Suba a fila (Redis) em outro terminal
+git clone https://github.com/Evechdvl/sd-2026-2-kit-c1a2.git
+cd sd-2026-2-kit-c1a2
+
+python3 -m venv .venv
+source .venv/bin/activate
+python -m pip install -r requirements.txt
+```
+
+Se a criação do ambiente virtual informar que `ensurepip` não está disponível:
+
+```bash
+sudo apt update
+sudo apt install -y python3.12-venv
+```
+
+Gere os stubs gRPC:
+
+```bash
+python -m grpc_tools.protoc -I proto --python_out=. \
+  --grpc_python_out=. proto/inferencia.proto
+```
+
+## Execução
+
+### Redis
+
+```bash
 docker compose up -d
+docker compose ps
+```
 
-# 5. Rode o serviço REST
-uvicorn app.api_rest:app --reload --port 8000
-# abra http://localhost:8000/docs
+O container deve aparecer como `Up` e `healthy`.
 
-# 6. Em outro terminal, rode o worker
+### API REST
+
+Em um terminal:
+
+```bash
+source .venv/bin/activate
+python -m uvicorn app.api_rest:app --reload --port 8001
+```
+
+Documentação: <http://localhost:8001/docs>
+
+### Worker
+
+Em outro terminal:
+
+```bash
+source .venv/bin/activate
 python -m app.worker
+```
 
-# 7. Teste o exemplo pronto (rota síncrona)
-python exemplos/cliente_rest.py "o atendimento foi otimo"
+Para demonstrar divisão de carga, execute dois workers:
 
-# 8. Para o gRPC, gere os stubs antes
-python -m grpc_tools.protoc -I proto --python_out=. --grpc_python_out=. proto/inferencia.proto
+```bash
+WORKER_ID=worker-1 python -m app.worker
+WORKER_ID=worker-2 python -m app.worker
+```
+
+O worker tenta cada inferência até três vezes. Após três falhas, envia a tarefa para `tarefas_dead_letter`.
+
+### Servidor gRPC
+
+Em outro terminal:
+
+```bash
+source .venv/bin/activate
 python -m app.servidor_grpc
 ```
 
----
+O servidor escuta a porta `50051`.
 
-## Estrutura do projeto
+## Cliente REST
 
-```
-sd-2026-2-kit-c1a2/
-├── app/
-│   ├── modelo.py           # PRONTO - modelo de sentimento offline
-│   ├── fila.py             # PRONTO - auxiliares de fila (Redis)
-│   ├── api_rest.py         # TAREFAS 1 e 2
-│   ├── worker.py           # TAREFAS 3 e 5
-│   └── servidor_grpc.py    # TAREFA 4
-├── proto/inferencia.proto  # contrato gRPC
-├── exemplos/cliente_rest.py
-├── scripts/gerar_stubs.*
-├── docker-compose.yml      # sobe o Redis
-└── TAREFAS.md              # <- comece por aqui
+Com a API, o Redis e o worker em execução:
+
+```bash
+source .venv/bin/activate
+python exemplos/cliente_rest.py "o atendimento foi otimo"
 ```
 
----
+O cliente testa a rota síncrona e o fluxo assíncrono completo.
 
-## O que você precisa fazer
+Para usar outra porta:
 
-Abra o arquivo **`TAREFAS.md`**: ele lista o núcleo obrigatório item a item, indicando
-o arquivo e a aula de referência de cada um.
+```bash
+REST_URL=http://localhost:8000 python exemplos/cliente_rest.py "texto de teste"
+```
 
----
+## Testes manuais REST
 
-## Como você será avaliado
+Inferência síncrona:
 
-| Critério | Pontos |
-|---|---|
-| Arquitetura e decomposição em serviços | 1,5 |
-| Comunicação funcionando (REST / gRPC / mensageria) | 1,5 |
-| Resiliência e tratamento de falhas | 1,0 |
-| Execução reproduzível (README, container, deploy) | 1,0 |
-| **Sofisticação do modelo de IA** | **não pontua** |
-| **Total** | **5,0** |
+```bash
+curl -X POST http://localhost:8001/predict-sync \
+  -H 'Content-Type: application/json' \
+  -d '{"texto":"o atendimento foi otimo"}'
+```
 
-**Entrega:** no seu repositório do GitHub, **sem apresentação oral**. Grupos livres.
+Submissão assíncrona:
 
----
+```bash
+curl -i -X POST http://localhost:8001/predict \
+  -H 'Content-Type: application/json' \
+  -d '{"texto":"o atendimento foi otimo"}'
+```
 
-## Aulas de referência
+Copie o ID retornado e consulte:
 
-- **Aula 4** — Do RPC ao gRPC (contrato `.proto` e stubs)
-- **Aula 5** — REST e OpenAPI com FastAPI
-- **Aula 6** — IA como serviço (carregar o modelo uma vez)
-- **Aula 8** — Mensageria: fila, worker e dead-letter
+```bash
+curl http://localhost:8001/resultado/ID_RETORNADO
+```
 
----
+Processamento em lote:
 
-## Dúvidas frequentes
+```bash
+curl -X POST http://localhost:8001/predict-batch \
+  -H 'Content-Type: application/json' \
+  -d '{"textos":["atendimento excelente","serviço ruim"]}'
+```
 
-**Preciso saber machine learning?** Não. O modelo já está pronto e você só chama uma função.
+Métricas:
 
-**E se eu não tiver internet no laboratório?** Tudo neste kit funciona offline. O modelo é
-treinado localmente e o cliente de LLM tem modo simulado.
+```bash
+curl http://localhost:8001/metricas
+```
 
-**Posso trocar a linguagem?** O kit é em Python porque é o ecossistema usado nas aulas.
-Se quiser usar outra linguagem, converse com o professor antes.
+## Teste gRPC
 
-**Posso usar IA para me ajudar a programar?** Sim. Este é um trabalho prático feito fora de
-sala, e usar ferramentas de IA é realista. O que se avalia é o **sistema funcionando** e as
-**decisões de arquitetura** — que você precisa saber explicar.
+```bash
+python - <<'PY'
+import grpc
+import inferencia_pb2
+import inferencia_pb2_grpc
+
+with grpc.insecure_channel("localhost:50051") as canal:
+    stub = inferencia_pb2_grpc.InferenciaStub(canal)
+    resposta = stub.PreverLote(
+        inferencia_pb2.PedidoLote(
+            textos=["atendimento excelente", "serviço ruim"]
+        )
+    )
+
+for item in resposta.resultados:
+    print(item.texto, item.sentimento, item.confianca)
+PY
+```
+
+## Armazenamento
+
+```text
+dados/
+├── resultados/       # um JSON por tarefa processada
+└── metricas.json     # contadores e latência média
+```
+
+O cache fica no Redis e pode ser limpo com:
+
+```bash
+docker exec sd-2026-2-kit-c1a2-redis-1 sh -c '
+redis-cli --scan --pattern "cache:*" |
+while read -r chave; do redis-cli DEL "$chave"; done
+'
+```
+
+O modelo local é versionado automaticamente. Quando a versão dos dados de treinamento muda, o `modelo.joblib` é treinado novamente na próxima inicialização.
+
+## Encerramento
+
+```bash
+docker compose down
+```
+
+Para manter os arquivos de resultados e métricas, não remova `dados/`.

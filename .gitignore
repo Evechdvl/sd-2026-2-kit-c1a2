@@ -9,3 +9,6 @@ venv/
 *_pb2_grpc.py
 .pytest_cache/
 .DS_Store
+dados/resultados/*
+!dados/resultados/.gitkeep
+dados/metricas.json
