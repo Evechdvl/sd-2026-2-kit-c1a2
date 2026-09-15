@@ -74,7 +74,7 @@ source .venv/bin/activate
 python -m uvicorn app.api_rest:app --reload --port 8001
 ```
 
-Deixe esse terminal aberto. A API ficará em <http://localhost:8001>.
+Deixe esse terminal aberto. A API ficará em <http://localhost:8001/docs>.
 
 ### Terminal 3 — Worker
 
